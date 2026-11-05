@@ -1,0 +1,123 @@
+options {
+  STATIC = false;
+  UNICODE_INPUT = true;
+}
+
+PARSER_BEGIN(BrailleParser)
+package com.Lenguajes2.braillector;
+
+import java.io.*;
+
+public class BrailleParser {
+    private StringBuilder salida = new StringBuilder();
+
+    public String getSalidaBraille() {
+        return salida.toString();
+    }
+
+    // --- Funciones auxiliares ---
+    private String mapearBraille(String letra) {
+        switch (letra.toLowerCase()) {
+            case "a": return "⠁";
+            case "b": return "⠃";
+            case "c": return "⠉";
+            case "d": return "⠙";
+            case "e": return "⠑";
+            case "f": return "⠋";
+            case "g": return "⠛";
+            case "h": return "⠓";
+            case "i": return "⠊";
+            case "j": return "⠚";
+            case "k": return "⠅";
+            case "l": return "⠇";
+            case "m": return "⠍";
+            case "n": return "⠝";
+            case "ñ": return "⠻";
+            case "o": return "⠕";
+            case "p": return "⠏";
+            case "q": return "⠟";
+            case "r": return "⠗";
+            case "s": return "⠎";
+            case "t": return "⠞";
+            case "u": return "⠥";
+            case "v": return "⠧";
+            case "w": return "⠺";
+            case "x": return "⠭";
+            case "y": return "⠽";
+            case "z": return "⠵";
+
+            // Vocales acentuadas y especiales según la CBE
+            case "á": return "⠷";
+            case "é": return "⠮";
+            case "í": return "⠌";
+            case "ó": return "⠬";
+            case "ú": return "⠾";
+            case "ü": return "⠼";
+            default: return "?";
+        }
+    }
+
+    private String prefijoMayuscula() {
+        return "⠄"; // Estándar CBE
+    }
+
+    private String prefijoNumero() {
+        return "⠼"; // Indicador numérico (puntos 3, 4, 5, 6)
+    }
+
+    private String mapearBrailleDigito(String d) {
+        // En Braille, los números del 1 al 9 y 0 usan las letras 'a'-'j'
+        char digito = d.charAt(0);
+        if (digito == '0') {
+            return mapearBraille("j");
+        }
+        return mapearBraille("" + (char)('a' + (digito - '1')));
+    }
+
+    private String mapearBrailleSigno(String s) {
+        switch (s) {
+            case ".": return "⠲";
+            case ",": return "⠂";
+            case ";": return "⠆";
+            case ":": return "⠒";
+            case "!": case "¡": return "⠖";
+            case "?": case "¿": return "⠢";
+            case "(": case ")": return "⠣";
+            case "+": return "⠬";
+            case "-": return "⠤";
+            case "*": return "⠡";
+            case "/": return "⠌";
+            case "=": return "⠶";
+            default: return "?";
+        }
+    }
+}
+PARSER_END(BrailleParser)
+
+// --- Reglas léxicas (Tokens) ---
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+}
+
+TOKEN : {
+    < LETRA : ["a"-"z", "á", "é", "í", "ó", "ú", "ü", "ñ"] >
+  | < MAYUSCULA : ["A"-"Z", "Á", "É", "Í", "Ó", "Ú", "Ü", "Ñ"] >
+  | < DIGITO : ["0"-"9"] >
+  | < SIGNO : ["+", "-", "/", "=", ".", ",", ";", ":", "¿", "?", "¡", "!", "(", ")", "\""] >
+}
+
+// --- Reglas sintácticas con acciones semánticas ---
+String traducir() :
+{
+    Token t;
+    StringBuilder resultado = new StringBuilder();
+}
+{
+    (
+        t = <LETRA> { resultado.append(mapearBraille(t.image)); }
+      | t = <MAYUSCULA> { resultado.append(prefijoMayuscula() + mapearBraille(t.image)); }
+      | t = <DIGITO> { resultado.append(prefijoNumero() + mapearBrailleDigito(t.image)); }
+      | t = <SIGNO> { resultado.append(mapearBrailleSigno(t.image)); }
+    )*
+    { return resultado.toString(); }
+}

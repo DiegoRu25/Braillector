@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Braillector</title>
+
+    <style>
+        :root {
+            --fondo: #f2f6ff;
+            --encabezado: #d6e7ff;
+            --panel: #f5f8ff;
+            --texto: #1e2833;
+            --borde: #b6c0cf;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: var(--texto);
+            background: var(--fondo);
+        }
+
+        /* ENCABEZADO */
+        header {
+            height: 340px;
+            background: var(--encabezado);
+            border-bottom: 1px solid var(--borde);
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            padding: 20px;
+        }
+
+        .logo {
+            width: min(665px, 90%);
+            height: 150px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .frase {
+            margin: 0;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        /* DOS PANELES PRINCIPALES */
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: calc(100vh - 340px);
+        }
+
+        .panel {
+            background: var(--panel);
+            padding: 75px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel:first-child {
+            border-right: 1px solid var(--borde);
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.6rem;
+            text-align: center;
+        }
+
+        /* ÁREA DE TEXTO */
+        #texto {
+            width: 100%;
+            min-height: 400px;
+            margin-top: 20px;
+            padding: 25px;
+            font: inherit;
+            resize: none;
+            border: 1px solid var(--borde);
+            border-radius: 20px;
+        }
+
+        /* BOTONES */
+        .botones {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            font: inherit;
+            border-radius: 8px;
+            border: 1px solid var(--borde);
+            background-color: #ffffff;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #e2ecfc;
+        }
+
+        #btn3d {
+            display: none;
+            background-color: #28a745;
+            color: white;
+            border: none;
+        }
+
+        #btn3d:hover {
+            background-color: #218838;
+        }
+
+        /* RESULTADO */
+        #resultado {
+            margin-top: 20px;
+            min-height: 400px;
+            padding: 25px;
+            overflow-wrap: anywhere;
+            font-size: 2rem;
+            letter-spacing: 2px;
+            border: 1px solid var(--borde);
+            border-radius: 20px;
+            background: #ffffff;
+        }
+
+        /* PANTALLAS PEQUEÑAS */
+        @media (max-width: 650px) {
+            header {
+                height: auto;
+                min-height: 220px;
+            }
+
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            .panel:first-child {
+                border-right: none;
+                border-bottom: 1px solid var(--borde);
+            }
+
+            .panel {
+                min-height: 350px;
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">
+        <img src="/logo.png" alt="Braillector">
+    </div>
+
+    <p class="frase">Traduce una oración de Español a Braille</p>
+</header>
+
+<main>
+
+    <!-- PANEL IZQUIERDO -->
+    <section class="panel">
+        <h2>Introduce tu texto</h2>
+
+        <textarea
+                id="texto"
+                placeholder="Escribe una palabra u oración"
+        ></textarea>
+
+        <div class="botones">
+            <button type="button" onclick="traducir()">
+                Traducir
+            </button>
+
+            <button
+                    type="button"
+                    id="btnMic"
+                    onclick="iniciarDictado()"
+                    title="Dictar por voz"
+            >
+                🎤
+            </button>
+        </div>
+    </section>
+
+    <!-- PANEL DERECHO -->
+    <section class="panel">
+        <h2>Traducción a Braille</h2>
+
+        <div id="resultado"></div>
+
+        <div class="botones">
+            <button
+                    type="button"
+                    id="btn3d"
+                    onclick="descargarSTL()"
+                    title="Generar modelo 3D para impresión"
+            >
+                🎲 Descargar 3D (.stl)
+            </button>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    let textoBrailleActual = "";
+
+    async function traducir() {
+        const texto = document.getElementById('texto').value;
+
+        const respuesta = await fetch('/api/braille/traducir', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ texto })
+        });
+
+        const datos = await respuesta.json();
+
+        if (datos.braille) {
+            textoBrailleActual = datos.braille;
+            document.getElementById('resultado').textContent = datos.braille;
+            document.getElementById('btn3d').style.display = 'inline-block';
+        } else {
+            textoBrailleActual = "";
+            document.getElementById('resultado').textContent = datos.error;
+            document.getElementById('btn3d').style.display = 'none';
+        }
+    }
+
+    function iniciarDictado() {
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert('Tu navegador no soporta el dictado por voz.');
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-MX';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        const btnMic = document.getElementById('btnMic');
+        const inputTexto = document.getElementById('texto');
+
+        btnMic.textContent = '🎙️ Escuchando...';
+
+        recognition.onresult = function(event) {
+            inputTexto.value = event.results[0][0].transcript;
+            traducir();
+        };
+
+        recognition.onerror = function() {
+            alert('No se pudo reconocer la voz. Inténtalo de nuevo.');
+        };
+
+        recognition.onend = function() {
+            btnMic.textContent = '🎤';
+        };
+
+        recognition.start();
+    }
+
+    // --- Generación de archivo STL para impresión 3D ---
+    function descargarSTL() {
+        if (!textoBrailleActual) return;
+
+        let stlContent = "solid braille_plaque\n";
+
+        const anchoCelda = 6.0;   // mm
+        const altoCelda = 10.0;   // mm
+        const radioPunto = 0.75;  // mm (diámetro 1.5mm estándar CBE)
+        const alturaPunto = 0.6;  // mm (relieve para lectura táctil)
+        const espesorBase = 2.0;  // mm
+
+        const totalCeldas = textoBrailleActual.length;
+        const largoBase = (totalCeldas * anchoCelda) + 4; // Margen exterior
+
+        // Base rectangular
+        stlContent += generarCajaSTL(0, 0, 0, largoBase, altoCelda, espesorBase);
+
+        // Puntos en relieve
+        let xOffset = 3;
+        for (let i = 0; i < textoBrailleActual.length; i++) {
+            const charCode = textoBrailleActual.charCodeAt(i);
+
+            if (charCode >= 0x2800 && charCode <= 0x28FF) {
+                const mask = charCode - 0x2800;
+
+                // Puntos 1 al 6 según codificación Braille Unicode
+                if (mask & 0x01) stlContent += generarCilindroSTL(xOffset + 1.2, 7.5, espesorBase, radioPunto, alturaPunto); // Punto 1
+                if (mask & 0x02) stlContent += generarCilindroSTL(xOffset + 1.2, 5.0, espesorBase, radioPunto, alturaPunto); // Punto 2
+                if (mask & 0x04) stlContent += generarCilindroSTL(xOffset + 1.2, 2.5, espesorBase, radioPunto, alturaPunto); // Punto 3
+                if (mask & 0x08) stlContent += generarCilindroSTL(xOffset + 3.6, 7.5, espesorBase, radioPunto, alturaPunto); // Punto 4
+                if (mask & 0x10) stlContent += generarCilindroSTL(xOffset + 3.6, 5.0, espesorBase, radioPunto, alturaPunto); // Punto 5
+                if (mask & 0x20) stlContent += generarCilindroSTL(xOffset + 3.6, 2.5, espesorBase, radioPunto, alturaPunto); // Punto 6
+            }
+            xOffset += anchoCelda;
+        }
+
+        stlContent += "endsolid braille_plaque\n";
+
+        // Crear enlace directo para descargar el archivo .stl
+        const blob = new Blob([stlContent], { type: 'model/stl' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'traduccion_braille_3d.stl';
+        link.click();
+    }
+
+    function generarCajaSTL(x, y, z, dx, dy, dz) {
+        return `  facet normal 0 0 -1\n    outer loop\n      vertex ${x} ${y} ${z}\n      vertex ${x+dx} ${y} ${z}\n      vertex ${x+dx} ${y+dy} ${z}\n    endloop\n  endfacet\n` +
+            `  facet normal 0 0 1\n    outer loop\n      vertex ${x} ${y} ${z+dz}\n      vertex ${x+dx} ${y+dy} ${z+dz}\n      vertex ${x} ${y+dy} ${z+dz}\n    endloop\n  endfacet\n`;
+    }
+
+    function generarCilindroSTL(cx, cy, cz, r, h) {
+        let cilindro = "";
+        const pasos = 8;
+        for (let i = 0; i < pasos; i++) {
+            let a1 = (i * 2 * Math.PI) / pasos;
+            let a2 = ((i + 1) * 2 * Math.PI) / pasos;
+
+            let x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+            let x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+
+            cilindro += `  facet normal 0 0 1\n    outer loop\n      vertex ${cx} ${cy} ${cz+h}\n      vertex ${x1} ${y1} ${cz+h}\n      vertex ${x2} ${y2} ${cz+h}\n    endloop\n  endfacet\n`;
+        }
+        return cilindro;
+    }
+</script>
+</body>
+</html>
