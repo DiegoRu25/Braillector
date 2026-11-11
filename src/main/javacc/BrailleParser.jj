@@ -62,11 +62,10 @@ public class BrailleParser {
     }
 
     private String prefijoNumero() {
-        return "⠼"; // Indicador numérico (puntos 3, 4, 5, 6)
+        return "⠼"; // Indicador numérico global
     }
 
     private String mapearBrailleDigito(String d) {
-        // En Braille, los números del 1 al 9 y 0 usan las letras 'a'-'j'
         char digito = d.charAt(0);
         if (digito == '0') {
             return mapearBraille("j");
@@ -111,12 +110,28 @@ String traducir() :
 {
     Token t;
     StringBuilder resultado = new StringBuilder();
+    String subNum = "";
 }
 {
     (
-        t = <LETRA> { resultado.append(mapearBraille(t.image)); }
+        // Si detectamos un bloque de dígitos seguido de letras (incluso con espacios intermedios), lanzamos error
+        LOOKAHEAD( (<DIGITO>)+ (<LETRA>|<MAYUSCULA>) )
+        t = <DIGITO> {
+            throw new ParseException(" : No se pueden mezclar números y letras.");
+        }
+        // Si detectamos letras seguidas de dígitos (incluso con espacios intermedios), lanzamos error
+      | LOOKAHEAD( (<LETRA>|<MAYUSCULA>)+ <DIGITO> )
+        t = <LETRA> {
+            throw new ParseException(" : No se pueden mezclar letras y números.");
+        }
+      | t = <LETRA> { resultado.append(mapearBraille(t.image)); }
       | t = <MAYUSCULA> { resultado.append(prefijoMayuscula() + mapearBraille(t.image)); }
-      | t = <DIGITO> { resultado.append(prefijoNumero() + mapearBrailleDigito(t.image)); }
+      | { subNum = ""; }
+        t = <DIGITO> { subNum += mapearBrailleDigito(t.image); }
+        (
+            t = <DIGITO> { subNum += mapearBrailleDigito(t.image); }
+        )*
+        { resultado.append(prefijoNumero() + subNum); }
       | t = <SIGNO> { resultado.append(mapearBrailleSigno(t.image)); }
     )*
     { return resultado.toString(); }
