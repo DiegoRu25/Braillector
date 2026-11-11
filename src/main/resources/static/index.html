@@ -155,6 +155,25 @@
             background: #ffffff;
         }
 
+        /* ESTILOS PARA LA VISTA PREVIA BRF */
+        .hoja-brf {
+            background: white;
+            width: 100%;
+            max-width: 550px;
+            height: 750px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+            padding: 40px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            font-family: 'Segoe UI Symbol', 'Courier New', monospace;
+            font-size: 1rem;
+            line-height: 1.6;
+            white-space: pre;
+            color: black;
+            text-align: left;
+            overflow: hidden;
+        }
+
         /* PANTALLAS PEQUEÑAS */
         @media (max-width: 650px) {
             header {
@@ -254,17 +273,48 @@
             <button
                     type="button"
                     id="btnBRF"
-                    onclick="descargarBRF()"
-                    title="Descargar para impresora Braille"
+                    onclick="mostrarPreviewBRF()"
+                    title="Vista previa para impresora Braille"
             >Descargar BRF</button>
         </div>
     </section>
 
 </main>
 
+<!-- Modal para la vista previa del BRF -->
+<div id="modal-brf" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; width: 90%; max-width: 800px; height: 90%; border-radius: 10px; display: flex; flex-direction: column; padding: 20px;">
+        <h2 style="margin-top: 0; text-align: center; color: var(--texto);">Vista Previa de Impresión</h2>
+
+        <!-- Contenedor con scroll para las hojas -->
+        <div id="brf-paginas" style="flex: 1; overflow-y: auto; overflow-x: hidden; background: #e0e0e0; padding: 30px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 30px;">
+            <!-- Aquí JavaScript inyectará las hojas -->
+        </div>
+
+        <div class="botones" style="margin-top: 15px; margin-bottom: 0; padding-top: 0;">
+            <button type="button" onclick="cerrarPreviewBRF()">Cancelar</button>
+            <button type="button" onclick="descargarBRF()" style="background-color: #28a745; color: white; border: none;">Confirmar y descargar BRF</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script>
     let textoBrailleActual = "";
+    let lineasBrfCache = null;
+
+    // Configuración del Worker de PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    // ASCII para la descarga del texto braille
+    const brailleToAscii = {
+        '⠁': 'a', '⠃': 'b', '⠉': 'c', '⠙': 'd', '⠑': 'e', '⠋': 'f', '⠛': 'g', '⠓': 'h', '⠊': 'i', '⠚': 'j',
+        '⠅': 'k', '⠇': 'l', '⠍': 'm', '⠝': 'n', '⠕': 'o', '⠏': 'p', '⠟': 'q', '⠗': 'r', '⠎': 's', '⠞': 't',
+        '⠥': 'u', '⠧': 'v', '⠺': 'w', '⠭': 'x', '⠽': 'y', '⠵': 'z',
+        '⠻': 'n', '⠷': 'a', '⠮': 'e', '⠌': 'i', '⠬': 'o', '⠾': 'u', '⠼': 'u',
+        '⠄': ',', '⠼': '#', '⠲': '4', '⠂': '1', '⠆': '2', '⠒': '3', '⠖': '6', '⠢': '8',
+        '⠣': '(', '⠬': '+', '⠤': '-', '⠡': '*', '⠌': '/', '⠶': '=', ' ': ' '
+    };
 
     async function traducir() {
         const texto = document.getElementById('texto').value;
@@ -281,6 +331,7 @@
 
         if (datos.braille) {
             textoBrailleActual = datos.braille;
+            lineasBrfCache = null;
             document.getElementById('resultado').textContent = datos.braille;
             document.getElementById('btn3d').style.display = 'inline-block';
             document.getElementById('btnBRF').style.display = 'inline-block';
@@ -330,7 +381,7 @@
         recognition.start();
     }
 
-    // --- Generación de archivo STL para impresión 3D ---
+    // Generación de archivo STL para impresión 3D
     function descargarSTL() {
         if (!textoBrailleActual) return;
 
@@ -397,7 +448,7 @@
         return cilindro;
     }
 
-    // --- Función para copiar el texto ---
+    // Función para copiar el texto
     function copiarTexto() {
         if (!textoBrailleActual) return;
         navigator.clipboard.writeText(textoBrailleActual).then(() => {
@@ -407,12 +458,12 @@
         });
     }
 
-    // --- Función para leer archivo de texto ---
+    // Función para leer archivo de texto
     async function leerArchivo(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        // --- CASO 1: ES UN ARCHIVO .TXT ---
+        // Para archivos txt
         if (file.type === "text/plain" || file.name.endsWith('.txt')) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -422,10 +473,10 @@
             };
             reader.readAsText(file);
             event.target.value = ''; // Limpiar
-            return; // Terminamos aquí para que no siga al código del PDF
+            return;
         }
 
-        // --- CASO 2: ES UN ARCHIVO .PDF (Tu código original) ---
+        // Para archivos pdf
         const reader = new FileReader();
         reader.onload = async function() {
             const typedarray = new Uint8Array(this.result);
@@ -455,88 +506,112 @@
         event.target.value = '';
     }
 
-    // --- Generación de archivo BRF para impresoras Braille ---
-    function descargarBRF() {
+    // Función para mostrar la vista previa
+    function mostrarPreviewBRF() {
         if (!textoBrailleActual) return;
 
-        // Diccionario de Braille Unicode a ASCII Braille (Estándar)
-        const brailleToAscii = {
-            '⠁': 'a', '⠃': 'b', '⠉': 'c', '⠙': 'd', '⠑': 'e', '⠋': 'f', '⠛': 'g', '⠓': 'h', '⠊': 'i', '⠚': 'j',
-            '⠅': 'k', '⠇': 'l', '⠍': 'm', '⠝': 'n', '⠕': 'o', '⠏': 'p', '⠟': 'q', '⠗': 'r', '⠎': 's', '⠞': 't',
-            '⠥': 'u', '⠧': 'v', '⠺': 'w', '⠭': 'x', '⠽': 'y', '⠵': 'z',
-            '⠻': 'n', // ñ (simplificado para BRF)
-            '⠷': 'a', '⠮': 'e', '⠌': 'i', '⠬': 'o', '⠾': 'u', '⠼': 'u', // Acentos (se imprimen como vocal base)
-            '⠄': ',', // Signo de mayúscula
-            '⠼': '#', // Signo de número
-            '⠲': '4', '⠂': '1', '⠆': '2', '⠒': '3', '⠖': '6', '⠢': '8', // Puntuación ASCII Braille
-            '⠣': '(', '⠬': '+', '⠤': '-', '⠡': '*', '⠌': '/', '⠶': '=',
-            ' ': ' ', '\n': '\n'
-        };
-
-        // Convertir el texto
-        let textoAscii = "";
-        for (let i = 0; i < textoBrailleActual.length; i++) {
-            textoAscii += brailleToAscii[textoBrailleActual[i]] || ' '; // Si hay un error, pone un espacio
+        if (!lineasBrfCache) {
+            lineasBrfCache = generarLineasBrf(textoBrailleActual);
         }
 
-        // Formatear a 40 columnas x 25 líneas
-        const anchoMaximo = 40;
+        const lineas = generarLineasBrf(textoBrailleActual);
         const lineasPorPagina = 25;
-        let brfFinal = "";
-        let contadorLineasPagina = 0;
+        const contenedor = document.getElementById('brf-paginas');
+        contenedor.innerHTML = ""; // Limpia hojas anteriores
 
-        const parrafos = textoAscii.split('\n');
+        // Agrupar líneas en páginas de 25
+        for (let i = 0; i < lineas.length; i += lineasPorPagina) {
+            const bloquePagina = lineas.slice(i, i + lineasPorPagina);
+
+            // Rellenar la página con líneas vacías si es la última y está incompleta
+            while (bloquePagina.length < lineasPorPagina) {
+                bloquePagina.push(" ");
+            }
+
+            // Crear el div de la hoja
+            const hoja = document.createElement('div');
+            hoja.className = 'hoja-brf';
+
+            // Unir las líneas de esta página
+            hoja.textContent = bloquePagina.join('\n');
+            contenedor.appendChild(hoja);
+        }
+
+        // Mostrar el modal
+        document.getElementById('modal-brf').style.display = 'flex';
+    }
+
+    // Función para cerrar el modal
+    function cerrarPreviewBRF() {
+        document.getElementById('modal-brf').style.display = 'none';
+    }
+
+    // Función auxiliar para crear las líneas de 40 caracteres
+    function generarLineasBrf(texto) {
+        const anchoMaximo = 40;
+        const parrafos = texto.split('\n');
+        let lineas = [];
 
         for (let parrafo of parrafos) {
-            if (parrafo.trim() === "") {
-                brfFinal += "\n";
-                contadorLineasPagina++;
-                if (contadorLineasPagina >= lineasPorPagina) { brfFinal += "\f"; contadorLineasPagina = 0; }
+            const palabras = parrafo.trim().split(/\s+/);
+
+            if (palabras.length === 1 && palabras[0] === "") {
+                lineas.push("");
                 continue;
             }
 
-            const palabras = parrafo.split(' ');
             let lineaActual = "";
 
             for (let palabra of palabras) {
-                // Si una palabra es gigante, la cortamos a la fuerza
                 while (palabra.length > anchoMaximo) {
                     if (lineaActual.length > 0) {
-                        brfFinal += lineaActual.trim() + "\n";
-                        contadorLineasPagina++;
-                        if (contadorLineasPagina >= lineasPorPagina) { brfFinal += "\f"; contadorLineasPagina = 0; }
+                        lineas.push(lineaActual.trim());
                         lineaActual = "";
                     }
-                    brfFinal += palabra.substring(0, anchoMaximo) + "\n";
-                    contadorLineasPagina++;
-                    if (contadorLineasPagina >= lineasPorPagina) { brfFinal += "\f"; contadorLineasPagina = 0; }
+                    lineas.push(palabra.substring(0, anchoMaximo));
                     palabra = palabra.substring(anchoMaximo);
                 }
 
-                // Si la palabra cabe en la línea actual, la agregamos
                 if (lineaActual.length + palabra.length + 1 > anchoMaximo) {
-                    brfFinal += lineaActual.trim() + "\n";
-                    contadorLineasPagina++;
-                    if (contadorLineasPagina >= lineasPorPagina) { brfFinal += "\f"; contadorLineasPagina = 0; }
+                    lineas.push(lineaActual.trim());
                     lineaActual = palabra + " ";
                 } else {
                     lineaActual += palabra + " ";
                 }
             }
-
             if (lineaActual.trim().length > 0) {
-                brfFinal += lineaActual.trim() + "\n";
-                contadorLineasPagina++;
-                if (contadorLineasPagina >= lineasPorPagina) { brfFinal += "\f"; contadorLineasPagina = 0; }
+                lineas.push(lineaActual.trim());
             }
         }
+        return lineas;
+    }
 
-        // Descargar el archivo
+    // Función de descarga de formato para impresoras de Braille
+    function descargarBRF() {
+        if (!textoBrailleActual) return;
+
+        if (!lineasBrfCache) {
+            lineasBrfCache = generarLineasBrf(textoBrailleActual);
+        }
+
+        let brfFinal = "";
+        const lineasPorPagina = 25;
+
+        for (let i = 0; i < lineasBrfCache.length; i++) {
+            let lineaAscii = "";
+            for (let j = 0; j < lineasBrfCache[i].length; j++) {
+                lineaAscii += brailleToAscii[lineasBrfCache[i][j]] || ' ';
+            }
+            brfFinal += lineaAscii + "\n";
+            if ((i + 1) % lineasPorPagina === 0) { brfFinal += "\f"; }
+        }
+
         const blob = new Blob([brfFinal], { type: 'text/plain;charset=utf-8' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = 'traduccion_braille.brf';
         link.click();
+        cerrarPreviewBRF();
     }
 
 </script>
