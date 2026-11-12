@@ -258,6 +258,11 @@
 
         <div id="resultado"></div>
 
+        <!-- Recuadro para errores -->
+        <div id="error-box" style="display: none; background: #ffebee; color: #c62828; border: 1px solid #de7c7c;
+        padding: 15px; border-radius: 8px; margin-top: 10px; font-weight: bold; font-size: 0.95rem; max-height:
+        100px; overflow-y: auto; white-space: pre-wrap;"></div>
+
         <div class="botones">
             <button
                     type="button"
@@ -277,8 +282,13 @@
                     title="Vista previa para impresora Braille"
             >Descargar BRF</button>
         </div>
+        <!-- Recuadro para traducción correcta -->
+        <div id="success-box" style="display: none; opacity: 0; transition: opacity 0.5s ease; background: #e8f5e9;
+        color: #2e7d32; border: 1px solid #a5d6a7; padding: 15px; border-radius: 8px; margin-top: 10px; font-weight:
+        bold; font-size: 0.95rem;">
+            Texto traducido correctamente
+        </div>
     </section>
-
 </main>
 
 <!-- Modal para la vista previa del BRF -->
@@ -316,8 +326,13 @@
         '⠣': '(', '⠬': '+', '⠤': '-', '⠡': '*', '⠌': '/', '⠶': '=', ' ': ' '
     };
 
+    let timeoutVerde, timeoutOcultarVerde; // Variables para controlar el tiempo
+
     async function traducir() {
         const texto = document.getElementById('texto').value;
+        const errorBox = document.getElementById('error-box');
+        const successBox = document.getElementById('success-box');
+        const resultadoBox = document.getElementById('resultado');
 
         const respuesta = await fetch('/api/braille/traducir', {
             method: 'POST',
@@ -329,16 +344,43 @@
 
         const datos = await respuesta.json();
 
+        clearTimeout(timeoutVerde);
+        clearTimeout(timeoutOcultarVerde);
+
         if (datos.braille) {
             textoBrailleActual = datos.braille;
             lineasBrfCache = null;
-            document.getElementById('resultado').textContent = datos.braille;
+            // Mostrar traducción y ocultar errores
+            resultadoBox.textContent = datos.braille;
+            errorBox.style.display = 'none';
+            errorBox.style.opacity = '1';
             document.getElementById('btn3d').style.display = 'inline-block';
             document.getElementById('btnBRF').style.display = 'inline-block';
             document.getElementById('btnCopiar').style.display = 'inline-block';
+
+            // Lógica del cuadro verde
+            successBox.style.display = 'block';
+            // Pequeño retraso para que el navegador detecte el cambio de display y aplique la transición
+            setTimeout(() => { successBox.style.opacity = '1'; }, 10);
+            // Inicia el temporizador de 3 segundos
+            timeoutVerde = setTimeout(() => {
+                successBox.style.opacity = '0'; // Se desvanece
+                // espera a transición para ocultar el cuadro
+                timeoutOcultarVerde = setTimeout(() => {
+                    successBox.style.display = 'none';
+                }, 200);
+            }, 1750);
+
         } else {
             textoBrailleActual = "";
-            document.getElementById('resultado').textContent = datos.error;
+            lineasBrfCache = null;
+            resultadoBox.textContent = "";
+            successBox.style.display = 'none'; // Ocultar el verde de inmediato si hay error
+            successBox.style.opacity = '0';
+
+            errorBox.textContent = datos.error;
+            errorBox.style.display = 'block';
+
             document.getElementById('btn3d').style.display = 'none';
             document.getElementById('btnBRF').style.display = 'none';
             document.getElementById('btnCopiar').style.display = 'none';
@@ -514,7 +556,7 @@
             lineasBrfCache = generarLineasBrf(textoBrailleActual);
         }
 
-        const lineas = generarLineasBrf(textoBrailleActual);
+        const lineas = lineasBrfCache;
         const lineasPorPagina = 25;
         const contenedor = document.getElementById('brf-paginas');
         contenedor.innerHTML = ""; // Limpia hojas anteriores

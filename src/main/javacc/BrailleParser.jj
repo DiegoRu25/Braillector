@@ -103,6 +103,7 @@ TOKEN : {
   | < MAYUSCULA : ["A"-"Z", "Á", "É", "Í", "Ó", "Ú", "Ü", "Ñ"] >
   | < DIGITO : ["0"-"9"] >
   | < SIGNO : ["+", "-", "/", "=", ".", ",", ";", ":", "¿", "?", "¡", "!", "(", ")", "\""] >
+  | < INVALIDO : ~[] >
 }
 
 // --- Reglas sintácticas con acciones semánticas ---
@@ -133,6 +134,7 @@ String traducir() :
         )*
         { resultado.append(prefijoNumero() + subNum); }
       | t = <SIGNO> { resultado.append(mapearBrailleSigno(t.image)); }
+      | t = <INVALIDO> { throw new ParseException(" : El símbolo '" + t.image + "' no es válido en Braille."); }
     )*
     { return resultado.toString(); }
 }
