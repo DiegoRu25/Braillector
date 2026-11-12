@@ -122,7 +122,7 @@ String traducir() :
         }
         // Si detectamos letras seguidas de dígitos (incluso con espacios intermedios), lanzamos error
       | LOOKAHEAD( (<LETRA>|<MAYUSCULA>)+ <DIGITO> )
-        t = <LETRA> {
+        (t = <LETRA> | t = <MAYUSCULA>) {
             throw new ParseException(" : No se pueden mezclar letras y números.");
         }
       | t = <LETRA> { resultado.append(mapearBraille(t.image)); }
